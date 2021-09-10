@@ -146,7 +146,7 @@ namespace cpp11 {
     template <class T, class First, class... Types>
     inline const T& get(const variant<First, Types...>& v) {
         if (v.index() != detail::variant_index<T, variant<First, Types...>>::value) throw std::runtime_error("Bad variant access");
-        return *static_cast<T*>(v.get());
+        return *static_cast<const T*>(v.get());
     }
 
     /* 
