@@ -54,7 +54,8 @@ namespace cpp11 {
         };
         template <std::size_t N, class T, class First>
         struct variant_index_impl<N, T, variant<First>, false> {
-            static_assert("There is no index corresponding to type T.");
+            // 必ずfalseになるようにする
+            static_assert(std::is_same<First, T>::value, "There is no index corresponding to type T.");
         };
         template <class T, class Variant>
         struct variant_index;
