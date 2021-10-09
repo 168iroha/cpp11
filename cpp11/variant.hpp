@@ -13,20 +13,31 @@ namespace cpp11 {
     namespace detail {
     
         template <class T, class First, class... Types>
-        struct variant_max_size_type_impl : variant_max_size_type_impl<typename std::conditional<(sizeof(T) > sizeof(First)), T, First>::type, Types...> {};
+        struct variant_max_sizeof_type_impl : variant_max_sizeof_type_impl<typename std::conditional<(sizeof(T) > sizeof(First)), T, First>::type, Types...> {};
         template <class T, class First>
-        struct variant_max_size_type_impl<T, First> {
+        struct variant_max_sizeof_type_impl<T, First> {
             using type = typename std::conditional<(sizeof(T) > sizeof(First)), T, First>::type;
         };
         // sizeof(T)が最大値となる型Tを得る
         template <class First, class... Types>
-        struct variant_max_size_type : variant_max_size_type_impl<First, First, Types...> {};   // variant_max_size_type_implの仕様の関係上Firstを複製する
-        
+        struct variant_max_sizeof_type : variant_max_sizeof_type_impl<First, First, Types...> {};   // variant_max_sizeof_type_implの仕様の関係上Firstを複製する
+
+        template <class T, class First, class... Types>
+        struct variant_max_alignof_type_impl : variant_max_alignof_type_impl<typename std::conditional<(alignof(T) > alignof(First)), T, First>::type, Types...> {};
+        template <class T, class First>
+        struct variant_max_alignof_type_impl<T, First> {
+            using type = typename std::conditional<(alignof(T) > alignof(First)), T, First>::type;
+        };
+        // alignof(T)が最大値となる型Tを得る
+        template <class First, class... Types>
+        struct variant_max_alignof_type : variant_max_alignof_type_impl<First, First, Types...> {};   // variant_max_alignof_type_implの仕様の関係上Firstを複製する
+
         // variantのストレージ
         template <class... Types>
         struct variant_storage {
-            using max_sizeof_type = typename detail::variant_max_size_type<Types...>::type;
-            alignas(Types...) unsigned char x[sizeof(max_sizeof_type)];
+            using max_sizeof_type = typename detail::variant_max_sizeof_type<Types...>::type;
+            using max_alignof_type = typename detail::variant_max_alignof_type<Types...>::type;
+            alignas(alignof(max_alignof_type)) unsigned char x[sizeof(max_sizeof_type)];
             
             // 領域を割り当てる
             template <class T>
@@ -87,20 +98,29 @@ namespace cpp11 {
             variant& v;     // variant型のキャプチャ
             copy_visitor(variant& v_) : v(v_) {}
             template <class T>
-            void operator()(const T& x) { this->v = x; }
+            void operator()(const T& x) {
+                this->v.storage_m.assign(x);
+                this->v.index_m = detail::variant_index<typename std::decay<T>::type, variant>::value;
+            }
         };
         struct move_visitor {
             variant& v;     // variant型のキャプチャ
             move_visitor(variant& v_) : v(v_) {}
             template <class T>
-            void operator()(T&& x) { this->v = std::move(x); }
+            void operator()(T&& x) {
+                this->v.storage_m.assign(std::move(x));
+                this->v.index_m = detail::variant_index<typename std::decay<T>::type, variant>::value;
+            }
         };
     public:
         variant() { *this = First(); }
         template <class T, typename std::enable_if<!std::is_same<typename std::decay<T>::type, variant>::value, std::nullptr_t>::type = nullptr>
-        variant(T&& v) { *this = std::forward<T>(v); }
-        variant(const variant& v) { *this = v; }
-        variant(variant&& v) { *this = std::move(v); }
+        variant(T&& v) {
+            this->storage_m.assign(std::forward<T>(v));
+            this->index_m = detail::variant_index<typename std::decay<T>::type, variant>::value;
+        }
+        variant(const variant& v) { visit(copy_visitor(*this), v); }
+        variant(variant&& v) { visit(move_visitor(*this), v); }
         ~variant() { this->destroy(); }
         
         using first_type = First;
@@ -114,10 +134,14 @@ namespace cpp11 {
         
         // 値の代入
         variant& operator=(const variant& v) {
+            // 領域を解放
+            this->destroy();
             visit(copy_visitor(*this), v);
             return *this;
         }
         variant& operator=(variant&& v) {
+            // 領域を解放
+            this->destroy();
             visit(move_visitor(*this), v);
             return *this;
         }

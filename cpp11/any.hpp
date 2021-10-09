@@ -24,7 +24,7 @@ namespace cpp11 {
             T value;
             holder(const T& v) : value(v) {}
             holder(T&& v) : value(v) {}
-            virtual const std::type_info& type() const { return typeid(nullptr); }
+            virtual const std::type_info& type() const { return typeid(T); }
             std::unique_ptr<holder_base> clone() const { return std::unique_ptr<holder_base>(new holder<T>(value)); }
         };
         
