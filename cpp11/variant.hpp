@@ -89,8 +89,12 @@ namespace cpp11 {
         std::size_t index_m = 0;
         
         // リソースを破棄するためのvisitのようなもの
+        template <class T>
+        auto destroy_call() -> void(*)(void*) {
+            return [](void* p) { static_cast<T*>(p)->~T(); };
+        }
         void destroy() {
-            static void(*fs[])(void*) = { [](void* p) { static_cast<First*>(p)->~First(); }, [](void* p) { static_cast<Types*>(p)->~Types(); }... };
+            static void(*fs[])(void*) = { destroy_call<First>(), destroy_call<Types>()... };
             fs[this->index()](this->storage_m.x);
         }
         // コピーおよびムーブのためのvisitor
