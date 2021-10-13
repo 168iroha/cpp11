@@ -24,6 +24,7 @@ namespace cpp11 {
             T value;
             holder(const T& v) : value(v) {}
             holder(T&& v) : value(v) {}
+            virtual ~holder() {}
             virtual const std::type_info& type() const { return typeid(T); }
             std::unique_ptr<holder_base> clone() const { return std::unique_ptr<holder_base>(new holder<T>(value)); }
         };
@@ -31,10 +32,8 @@ namespace cpp11 {
         std::unique_ptr<holder_base> data_m;
     public:
         any() : data_m(new holder_base()) {}
-        template <class T>
-        any(const T& v) : data_m(new holder<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(v)) {}
-        template <class T>
-        any(T&& v) : data_m(new holder<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(v)) {}
+        template <class T, typename std::enable_if<std::is_copy_constructible<typename std::decay<T>::type>::value, std::nullptr_t>::type = nullptr>
+        any(T&& v) : data_m(new holder<typename std::decay<T>::type>(std::forward<T>(v))) {}
         any(const any& v)  { *this = v; }
         any(any&& v) { *this = std::move(v); }
 
@@ -45,9 +44,9 @@ namespace cpp11 {
         const std::type_info& type() const noexcept { return this->data_m->type(); }
         
         // 値の代入
-        template <class T>
+        template <class T, typename std::enable_if<std::is_copy_constructible<typename std::decay<T>::type>::value, std::nullptr_t>::type = nullptr>
         any& operator=(T&& v) {
-            this->data_m = std::unique_ptr<holder_base>(new holder<typename std::remove_cv<typename std::remove_reference<T>::type>::type>(std::forward<T>(v)));
+            this->data_m = std::unique_ptr<holder_base>(new holder<typename std::decay<T>::type>(std::forward<T>(v)));
             return *this;
         }
         any& operator=(const any& v) {
