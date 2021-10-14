@@ -117,7 +117,10 @@ namespace cpp11 {
             }
         };
     public:
-        variant() { *this = First(); }
+        variant() {
+            this->storage_m.assign(First());
+            this->index_m = detail::variant_index<First, variant>::value;
+        }
         template <class T, typename std::enable_if<!std::is_same<typename std::decay<T>::type, variant>::value, std::nullptr_t>::type = nullptr>
         variant(T&& v) {
             this->storage_m.assign(std::forward<T>(v));
